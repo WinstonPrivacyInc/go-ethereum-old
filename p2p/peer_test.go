@@ -43,6 +43,7 @@ var discard = Protocol{
 	},
 }
 
+
 func testPeer(protos []Protocol) (func(), *conn, *Peer, <-chan error) {
 	fd1, fd2 := net.Pipe()
 	c1 := &conn{fd: fd1, transport: newTestTransport(randomID(), fd1)}
@@ -196,6 +197,7 @@ func TestPeerDisconnectRace(t *testing.T) {
 		}
 	}
 }
+
 
 func TestNewPeer(t *testing.T) {
 	name := "nodename"

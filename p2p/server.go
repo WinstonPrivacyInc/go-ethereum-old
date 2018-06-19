@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	//"strings"
 )
 
 const (
@@ -326,6 +327,9 @@ func (srv *Server) makeSelf(listener net.Listener, ntab discoverTable) *discover
 		}
 		// Otherwise inject the listener address too
 		addr := listener.Addr().(*net.TCPAddr)
+
+		srv.log.Info("makeSelf", "addr", addr, "ntab", ntab, "listener", listener)
+
 		return &discover.Node{
 			ID:  discover.PubkeyID(&srv.PrivateKey.PublicKey),
 			IP:  addr.IP,
@@ -509,6 +513,9 @@ func (srv *Server) Start() (err error) {
 func (srv *Server) startListening() error {
 	// Launch the TCP listener.
 	listener, err := net.Listen("tcp", srv.ListenAddr)
+
+	srv.log.Info("startListening", "listenAddr", srv.ListenAddr)
+
 	if err != nil {
 		return err
 	}
@@ -642,6 +649,8 @@ running:
 					p.events = &srv.peerFeed
 				}
 				name := truncateName(c.name)
+				//fmt.Printf("  *** run() <- addpeer - c: %+v  peer: %+v\n", c, p)
+				//fmt.Println("  *** Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				srv.log.Debug("Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				go srv.runPeer(p)
 				peers[c.id] = p
@@ -741,10 +750,14 @@ func (srv *Server) listenLoop() {
 	defer srv.loopWG.Done()
 	srv.log.Info("RLPx listener up", "self", srv.makeSelf(srv.listener, srv.ntab))
 
+
 	tokens := defaultMaxPendingPeers
 	if srv.MaxPendingPeers > 0 {
 		tokens = srv.MaxPendingPeers
 	}
+
+	srv.log.Debug("RLPx listener", "maxPendingPeers", tokens)
+
 	slots := make(chan struct{}, tokens)
 	for i := 0; i < tokens; i++ {
 		slots <- struct{}{}
@@ -759,7 +772,9 @@ func (srv *Server) listenLoop() {
 			err error
 		)
 		for {
+			srv.log.Debug("RLPx listener is waiting")
 			fd, err = srv.listener.Accept()
+			srv.log.Debug("RLPx listener - Incoming Connection")
 			if tempErr, ok := err.(tempError); ok && tempErr.Temporary() {
 				srv.log.Debug("Temporary read error", "err", err)
 				continue
@@ -797,6 +812,9 @@ func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *discover.Nod
 	if self == nil {
 		return errors.New("shutdown")
 	}
+	//if dialDest != nil {
+	//	fmt.Printf("*** SetupConn: self=[%+v]  fd=%+v  dialDest=%+v\n", self, fd, dialDest)
+	//}
 	c := &conn{fd: fd, transport: srv.newTransport(fd), flags: flags, cont: make(chan error)}
 	err := srv.setupConn(c, flags, dialDest)
 	if err != nil {
@@ -820,6 +838,8 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) e
 		srv.log.Trace("Failed RLPx handshake", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)
 		return err
 	}
+
+	//fmt.Println("*** id", c.id, "addr", c.fd.RemoteAddr(), "conn", c.flags)
 	clog := srv.log.New("id", c.id, "addr", c.fd.RemoteAddr(), "conn", c.flags)
 	// For dialed connections, check that the remote public key matches.
 	if dialDest != nil && c.id != dialDest.ID {
@@ -827,6 +847,8 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) e
 		return DiscUnexpectedIdentity
 	}
 	err = srv.checkpoint(c, srv.posthandshake)
+
+
 	if err != nil {
 		clog.Trace("Rejected peer before protocol handshake", "err", err)
 		return err
@@ -863,6 +885,7 @@ func truncateName(s string) string {
 // checkpoint sends the conn to run, which performs the
 // post-handshake checks for the stage (posthandshake, addpeer).
 func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
+	//fmt.Printf("*** checkpoint()\n")
 	select {
 	case stage <- c:
 	case <-srv.quit:
@@ -880,6 +903,7 @@ func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
 // it waits until the Peer logic returns and removes
 // the peer.
 func (srv *Server) runPeer(p *Peer) {
+	//fmt.Printf("  *** [%s] runPeer() called for remote peer [%s]\n", srv.Self().ID.String()[0:10], p.ID().String()[0:10] )
 	if srv.newPeerHook != nil {
 		srv.newPeerHook(p)
 	}
@@ -967,3 +991,18 @@ func (srv *Server) PeersInfo() []*PeerInfo {
 	}
 	return infos
 }
+
+// RLS 5/8/2018 - exposes the Closest() function so that callers can retrieve the closest
+// nodes in the Kademlia DHT.
+func (srv *Server) Closest(targetID discover.NodeID, nresults int) ([]*discover.Node) {
+	if srv.ntab != nil {
+		return srv.ntab.Closest(targetID, nresults)
+	}
+	return nil
+}
+
+/*func (srv *Server) Table() *discover.Table {
+	//tab := srv.ntab.(discover.Table)
+	return &(discover.Table)(srv.ntab)
+}*/
+

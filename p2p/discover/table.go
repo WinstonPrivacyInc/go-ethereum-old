@@ -57,7 +57,9 @@ const (
 	maxBondingPingPongs = 16 // Limit on the number of concurrent ping/pong interactions
 	maxFindnodeFailures = 5  // Nodes exceeding this limit are dropped
 
-	refreshInterval    = 30 * time.Minute
+	// Set refresh to 10 minutes. This is how long it will take to reconnect to the privacy network in the event
+	// of a total disconnect.
+	refreshInterval    = 10 * time.Minute
 	revalidateInterval = 10 * time.Second
 	copyNodesInterval  = 30 * time.Second
 	seedMinTableTime   = 5 * time.Minute
@@ -205,6 +207,7 @@ func (tab *Table) ReadRandomNodes(buf []*Node) (n int) {
 			break
 		}
 	}
+
 	return i + 1
 }
 
@@ -361,6 +364,7 @@ func (tab *Table) refresh() <-chan struct{} {
 
 // loop schedules refresh, revalidate runs and coordinates shutdown.
 func (tab *Table) loop() {
+	//fmt.Printf("  *** Starting loop() - %+v\n", refreshInterval)
 	var (
 		revalidate     = time.NewTimer(tab.nextRevalidateTime())
 		refresh        = time.NewTicker(refreshInterval)
@@ -530,6 +534,7 @@ func (tab *Table) copyBondedNodes() {
 		}
 	}
 }
+
 
 // closest returns the n nodes in the table that are closest to the
 // given id. The caller must hold tab.mutex.
@@ -861,4 +866,19 @@ func (h *nodesByDistance) push(n *Node, maxElems int) {
 		copy(h.entries[ix+1:], h.entries[ix:])
 		h.entries[ix] = n
 	}
+}
+
+// RLS 4/6/2018 - Returns the closest nodes to the given target.
+func (tab *Table) Closest(targetID NodeID, nresults int) ([]*Node) {
+	target:= crypto.Keccak256Hash(targetID[:])
+
+	tab.mutex.Lock()
+	nodes := tab.closest(target, nresults)
+	tab.mutex.Unlock()
+
+	if nodes != nil {
+		return nodes.entries
+	}
+
+	return nil
 }

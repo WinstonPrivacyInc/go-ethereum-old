@@ -184,6 +184,7 @@ func (p *Peer) Log() log.Logger {
 }
 
 func (p *Peer) run() (remoteRequested bool, err error) {
+	//fmt.Printf("  *** run() called for remote peer [%s] %v  Local Address: \n", p.ID().String()[0:10], p.RemoteAddr(), p.LocalAddr() )
 	var (
 		writeStart = make(chan struct{}, 1)
 		writeErr   = make(chan error, 1)
@@ -250,7 +251,9 @@ func (p *Peer) pingLoop() {
 	}
 }
 
+// readLoop is initiated when a peer connection has been made with a remote node
 func (p *Peer) readLoop(errc chan<- error) {
+	//fmt.Printf("  *** readLoop() started with remote peer [%s]\n", p.ID().String()[0:10])
 	defer p.wg.Done()
 	for {
 		msg, err := p.rw.ReadMsg()
@@ -288,6 +291,7 @@ func (p *Peer) handle(msg Msg) error {
 		}
 		select {
 		case proto.in <- msg:
+//fmt.Printf("  *** Handle() - received msg [%+v] from peer [%s] \n", msg, p.ID().String()[0:10])
 			return nil
 		case <-p.closed:
 			return io.EOF
@@ -363,12 +367,14 @@ func (p *Peer) startProtocols(writeStart <-chan struct{}, writeErr chan<- error)
 // the given message code.
 func (p *Peer) getProto(code uint64) (*protoRW, error) {
 	for _, proto := range p.running {
+		//fmt.Printf("  *** proto: %+v\n", proto)
 		if code >= proto.offset && code < proto.offset+proto.Length {
 			return proto, nil
 		}
 	}
 	return nil, newPeerError(errInvalidMsgCode, "%d", code)
 }
+
 
 type protoRW struct {
 	Protocol
@@ -400,6 +406,7 @@ func (rw *protoRW) WriteMsg(msg Msg) (err error) {
 }
 
 func (rw *protoRW) ReadMsg() (Msg, error) {
+
 	select {
 	case msg := <-rw.in:
 		msg.Code -= rw.offset
@@ -460,3 +467,10 @@ func (p *Peer) Info() *PeerInfo {
 	}
 	return info
 }
+
+
+// RLS 6/1/2018 - Made this public
+func (p *Peer) GetProto(code uint64) (*protoRW, error) {
+	return p.getProto(code)
+}
+

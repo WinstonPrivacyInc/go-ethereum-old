@@ -90,6 +90,9 @@ type discoverTable interface {
 	Resolve(target discover.NodeID) *discover.Node
 	Lookup(target discover.NodeID) []*discover.Node
 	ReadRandomNodes([]*discover.Node) int
+
+	// RLS 5/8/2018 - Added to support closest node lookups.
+	Closest(discover.NodeID, int) ([]*discover.Node)
 }
 
 // the dial history remembers recent dials.
