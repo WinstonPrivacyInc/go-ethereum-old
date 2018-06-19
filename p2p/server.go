@@ -107,6 +107,10 @@ type Config struct {
 	// IP networks contained in the list are considered.
 	NetRestrict *netutil.Netlist `toml:",omitempty"`
 
+
+	// RLS 6/19/2018 - Maintain list of banned IP addresses
+	BannedNodes *netutil.DistinctNetSet `toml:",omitempty"`
+
 	// NodeDatabase is the path to the database containing the previously seen
 	// live nodes in the network.
 	NodeDatabase string `toml:",omitempty"`
@@ -795,6 +799,17 @@ func (srv *Server) listenLoop() {
 			}
 		}
 
+		// TODO: Reject connections on banned list
+		if srv.BannedNodes != nil {
+			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok && srv.BannedNodes.Contains(tcp.IP) {
+				//fmt.Println("Rejected conn (node banned)", "addr", tcp.IP)
+				srv.log.Debug("Rejected conn (node banned)", "addr", tcp.IP)
+				fd.Close()
+				slots <- struct{}{}
+				continue
+			}
+		}
+
 		fd = newMeteredConn(fd, true)
 		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		go func() {
@@ -802,6 +817,22 @@ func (srv *Server) listenLoop() {
 			slots <- struct{}{}
 		}()
 	}
+}
+
+// Bans a remote IP. Connections from banned IPs will be dropped.
+func (srv *Server) BanNode(ip net.IP) {
+	if srv.BannedNodes == nil {
+		srv.BannedNodes = &netutil.DistinctNetSet{
+			Subnet:	15,
+			Limit: 255,
+		}
+	}
+	srv.BannedNodes.Add(ip)
+}
+
+// Unbans a remote IP
+func (srv *Server) UnbanNode(ip net.IP) {
+	srv.BannedNodes.Remove(ip)
 }
 
 // SetupConn runs the handshakes and attempts to add the connection

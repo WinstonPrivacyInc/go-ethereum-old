@@ -122,6 +122,7 @@ func (l *Netlist) Add(cidr string) {
 	*l = append(*l, *n)
 }
 
+
 // Contains reports whether the given IP is contained in the list.
 func (l *Netlist) Contains(ip net.IP) bool {
 	if l == nil {
