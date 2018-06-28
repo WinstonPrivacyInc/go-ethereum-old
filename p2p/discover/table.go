@@ -116,6 +116,7 @@ type bucket struct {
 
 func newTable(t transport, ourID NodeID, ourAddr *net.UDPAddr, nodeDBPath string, bootnodes []*Node) (*Table, error) {
 	// If no node database was given, use an in-memory one
+	//fmt.Printf("*** nodeDBPath was: [%s]\n", nodeDBPath)
 	db, err := newNodeDB(nodeDBPath, Version, ourID)
 	if err != nil {
 		return nil, err

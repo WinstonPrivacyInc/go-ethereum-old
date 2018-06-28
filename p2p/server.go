@@ -799,7 +799,7 @@ func (srv *Server) listenLoop() {
 			}
 		}
 
-		// TODO: Reject connections on banned list
+		// Reject connections on banned list
 		if srv.BannedNodes != nil {
 			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok && srv.BannedNodes.Contains(tcp.IP) {
 				//fmt.Println("Rejected conn (node banned)", "addr", tcp.IP)

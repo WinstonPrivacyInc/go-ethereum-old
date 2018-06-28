@@ -575,6 +575,7 @@ func decodePacket(buf []byte) (packet, NodeID, []byte, error) {
 	}
 	s := rlp.NewStream(bytes.NewReader(sigdata[1:]), 0)
 	err = s.Decode(req)
+	//fmt.Printf("*** decodePacket() - req: %+v\n", req)
 	return req, fromID, hash, err
 }
 
