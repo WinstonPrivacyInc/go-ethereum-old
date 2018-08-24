@@ -82,6 +82,9 @@ type dialstate struct {
 
 	start     time.Time        // time when the dialer was first used
 	bootnodes []*discover.Node // default dials when there are no peers
+
+	// RLS 8/24/2018 - reference to server's BannedNodes list, allowing us to prevent outbound connections to blacklisted nodes
+	BannedNodes *netutil.DistinctNetSet
 }
 
 type discoverTable interface {
@@ -130,7 +133,7 @@ type waitExpireTask struct {
 	time.Duration
 }
 
-func newDialState(static []*discover.Node, bootnodes []*discover.Node, ntab discoverTable, maxdyn int, netrestrict *netutil.Netlist) *dialstate {
+func newDialState(static []*discover.Node, bootnodes []*discover.Node, ntab discoverTable, maxdyn int, netrestrict *netutil.Netlist, bannednodes *netutil.DistinctNetSet) *dialstate {
 	s := &dialstate{
 		maxDynDials: maxdyn,
 		ntab:        ntab,
@@ -140,6 +143,7 @@ func newDialState(static []*discover.Node, bootnodes []*discover.Node, ntab disc
 		bootnodes:   make([]*discover.Node, len(bootnodes)),
 		randomNodes: make([]*discover.Node, maxdyn/2),
 		hist:        new(dialHistory),
+		BannedNodes: bannednodes,
 	}
 	copy(s.bootnodes, bootnodes)
 	for _, n := range static {
@@ -170,9 +174,11 @@ func (s *dialstate) newTasks(nRunning int, peers map[discover.NodeID]*Peer, now 
 	var newtasks []task
 	addDial := func(flag connFlag, n *discover.Node) bool {
 		if err := s.checkDial(n, peers); err != nil {
+			//fmt.Println("Skipping dial candidate", err)
 			log.Trace("Skipping dial candidate", "id", n.ID, "addr", &net.TCPAddr{IP: n.IP, Port: int(n.TCP)}, "err", err)
 			return false
 		}
+		//fmt.Println("[DEBUG] newTasks() - dialing remote peer")
 		s.dialing[n.ID] = flag
 		newtasks = append(newtasks, &dialTask{flags: flag, dest: n})
 		return true
@@ -191,6 +197,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[discover.NodeID]*Peer, now 
 		}
 	}
 
+	//fmt.Println("[DEBUG] newTasks - needDynDials:", needDynDials, "len(s.static)", len(s.static))
 	// Expire the dial history on every invocation.
 	s.hist.expire(now)
 
@@ -210,11 +217,15 @@ func (s *dialstate) newTasks(nRunning int, peers map[discover.NodeID]*Peer, now 
 	// scenario is useful for the testnet (and private networks) where the discovery
 	// table might be full of mostly bad peers, making it hard to find good ones.
 	if len(peers) == 0 && len(s.bootnodes) > 0 && needDynDials > 0 && now.Sub(s.start) > fallbackInterval {
+		//fmt.Println("[DEBUG] len(peers)", len(peers), "bootnodes", len(s.bootnodes), "now - start", now.Sub(s.start), "fallback interval", fallbackInterval)
+
 		bootnode := s.bootnodes[0]
 		s.bootnodes = append(s.bootnodes[:0], s.bootnodes[1:]...)
 		s.bootnodes = append(s.bootnodes, bootnode)
 
+		//fmt.Println("[DEBUG] have a bootnode:", bootnode)
 		if addDial(dynDialedConn, bootnode) {
+			fmt.Println("[DEBUG] Going to dial a random bootnode")
 			needDynDials--
 		}
 	}
@@ -261,11 +272,14 @@ var (
 	errAlreadyConnected = errors.New("already connected")
 	errRecentlyDialed   = errors.New("recently dialed")
 	errNotWhitelisted   = errors.New("not contained in netrestrict whitelist")
+	errBanned	    = errors.New("node is banned")
 )
 
 func (s *dialstate) checkDial(n *discover.Node, peers map[discover.NodeID]*Peer) error {
 	_, dialing := s.dialing[n.ID]
 	switch {
+	case s.BannedNodes != nil && s.BannedNodes.Contains(n.IP):
+		return errBanned
 	case dialing:
 		return errAlreadyDialing
 	case peers[n.ID] != nil:

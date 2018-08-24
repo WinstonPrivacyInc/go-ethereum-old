@@ -490,8 +490,17 @@ func (srv *Server) Start() (err error) {
 		srv.DiscV5 = ntab
 	}
 
+
+	// RLS - set up a ban list. This will prevent both incoming and outgoing RLPx connections. We have to
+	// prevent outgoing connections because Ethereum will automatically attempt to reconnect to nodes after
+	// they've been dropped.
+	srv.BannedNodes = &netutil.DistinctNetSet{
+		Subnet:	28,
+		Limit: 255,
+	}
+
 	dynPeers := srv.maxDialedConns()
-	dialer := newDialState(srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers, srv.NetRestrict)
+	dialer := newDialState(srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers, srv.NetRestrict, srv.BannedNodes)
 
 	// handshake
 	srv.ourHandshake = &protoHandshake{Version: baseProtocolVersion, Name: srv.Name, ID: discover.PubkeyID(&srv.PrivateKey.PublicKey)}
@@ -511,6 +520,8 @@ func (srv *Server) Start() (err error) {
 	srv.loopWG.Add(1)
 	go srv.run(dialer)
 	srv.running = true
+
+
 	return nil
 }
 
@@ -678,6 +689,7 @@ running:
 			if pd.Inbound() {
 				inboundCount--
 			}
+			//fmt.Printf("[DEBUG] server.go - peers table (%d) (%+v)\n", len(peers), peers)
 		}
 	}
 
@@ -828,6 +840,7 @@ func (srv *Server) BanNode(ip net.IP) {
 		}
 	}
 	srv.BannedNodes.Add(ip)
+	fmt.Printf("[DEBUG] Bannode(%v)\n", ip)
 }
 
 // Unbans a remote IP
@@ -934,7 +947,7 @@ func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
 // it waits until the Peer logic returns and removes
 // the peer.
 func (srv *Server) runPeer(p *Peer) {
-	//fmt.Printf("  *** [%s] runPeer() called for remote peer [%s]\n", srv.Self().ID.String()[0:10], p.ID().String()[0:10] )
+	//fmt.Printf("[DEBUG] [%s] runPeer() called for remote peer [%s]\n", srv.Self().ID.String()[0:10], p.ID().String()[0:10] )
 	if srv.newPeerHook != nil {
 		srv.newPeerHook(p)
 	}
@@ -957,6 +970,7 @@ func (srv *Server) runPeer(p *Peer) {
 
 	// Note: run waits for existing peers to be sent on srv.delpeer
 	// before returning, so this send should not select on srv.quit.
+	//fmt.Printf("[DEBUG] Dropping peer...\n")
 	srv.delpeer <- peerDrop{p, err, remoteRequested}
 }
 
