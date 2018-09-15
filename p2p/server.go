@@ -840,7 +840,7 @@ func (srv *Server) BanNode(ip net.IP) {
 		}
 	}
 	srv.BannedNodes.Add(ip)
-	fmt.Printf("[DEBUG] Bannode(%v)\n", ip)
+	//fmt.Printf("[DEBUG] Bannode(%v)\n", ip)
 }
 
 // Unbans a remote IP

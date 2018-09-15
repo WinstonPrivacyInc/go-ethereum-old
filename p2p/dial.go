@@ -225,7 +225,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[discover.NodeID]*Peer, now 
 
 		//fmt.Println("[DEBUG] have a bootnode:", bootnode)
 		if addDial(dynDialedConn, bootnode) {
-			fmt.Println("[DEBUG] Going to dial a random bootnode")
+			//fmt.Println("[DEBUG] Going to dial a random bootnode")
 			needDynDials--
 		}
 	}
