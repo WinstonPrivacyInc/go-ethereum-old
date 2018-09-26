@@ -308,7 +308,13 @@ func (tab *Table) lookup(targetID NodeID, refreshIfEmpty bool) []*Node {
 		// We actually wait for the refresh to complete here. The very
 		// first query will hit this case and run the bootstrapping
 		// logic.
+		//fmt.Printf("[DEBUG] table.go - tab.refresh()\n")
 		<-tab.refresh()
+		if len(result.entries)==0 {
+			//fmt.Printf("[DEBUG] table.go - no seed nodes found.\n")
+			time.Sleep(10 * time.Second)
+		}
+		//fmt.Printf("[DEBUG] table.go - len(result.entries)=%d\n", len(result.entries))
 		refreshIfEmpty = false
 	}
 
@@ -430,7 +436,6 @@ loop:
 // bootstrap or discarded faulty peers).
 func (tab *Table) doRefresh(done chan struct{}) {
 	defer close(done)
-
 	// Load nodes from the database and insert
 	// them. This should yield a few previously seen nodes that are
 	// (hopefully) still alive.

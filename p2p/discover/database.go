@@ -313,7 +313,6 @@ func (db *nodeDB) querySeeds(n int, maxAge time.Duration) []*Node {
 		id    NodeID
 	)
 	defer it.Release()
-
 seek:
 	for seeks := 0; len(nodes) < n && seeks < n*5; seeks++ {
 		// Seek to a random entry. The first byte is incremented by a
