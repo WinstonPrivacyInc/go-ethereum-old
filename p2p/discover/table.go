@@ -312,7 +312,7 @@ func (tab *Table) lookup(targetID NodeID, refreshIfEmpty bool) []*Node {
 		<-tab.refresh()
 		if len(result.entries)==0 {
 			//fmt.Printf("[DEBUG] table.go - no seed nodes found.\n")
-			time.Sleep(10 * time.Second)
+			time.Sleep(120 * time.Second)
 		}
 		//fmt.Printf("[DEBUG] table.go - len(result.entries)=%d\n", len(result.entries))
 		refreshIfEmpty = false
