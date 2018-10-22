@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"strings"
 
 	"github.com/go-stack/stack"
 )
@@ -160,6 +161,7 @@ func FilterHandler(fn func(r *Record) bool, h Handler) Handler {
 //
 //    log.MatchFilterHandler("pkg", "app/ui", log.StdoutHandler)
 //
+// RLS - Modified to prefix match
 func MatchFilterHandler(key string, value interface{}, h Handler) Handler {
 	return FilterHandler(func(r *Record) (pass bool) {
 		switch key {
@@ -172,8 +174,10 @@ func MatchFilterHandler(key string, value interface{}, h Handler) Handler {
 		}
 
 		for i := 0; i < len(r.Ctx); i += 2 {
-			if r.Ctx[i] == key {
-				return r.Ctx[i+1] == value
+			//fmt.Println("[DEBUG]", r.Ctx[i].(string), "?=", key)
+			if r.Ctx[i].(string) == key {
+			//if strings.HasPrefix(r.Ctx[i].(string), key) {
+				return strings.HasPrefix(r.Ctx[i+1].(string), value.(string))
 			}
 		}
 		return false
