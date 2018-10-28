@@ -230,7 +230,8 @@ type udp struct {
 }
 
 // ListenUDP returns a new table that listens for UDP packets on laddr.
-func ListenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, nodeDBPath string, netrestrict *netutil.Netlist) (*Network, error) {
+func ListenUDP(priv *ecdsa.PrivateKey, conn conn, nodeDBPath string, netrestrict *netutil.Netlist) (*Network, error) {
+	realaddr := conn.LocalAddr().(*net.UDPAddr)
 	transport, err := listenUDP(priv, conn, realaddr)
 	if err != nil {
 		return nil, err
@@ -395,6 +396,7 @@ func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
 	if err := decodePacket(buf, &pkt); err != nil {
 		log.Debug(fmt.Sprintf("Bad packet from %v: %v", from, err))
 		//fmt.Println("bad packet", err)
+		fmt.Printf("Bad packet from %v: %v\n", from, err)
 		return err
 	}
 	t.net.reqReadPacket(pkt)

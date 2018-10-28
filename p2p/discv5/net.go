@@ -678,9 +678,10 @@ func (net *Network) refresh(done chan<- struct{}) {
 	}
 	if len(seeds) == 0 {
 		log.Trace("no seed nodes found")
-		close(done)
+		time.AfterFunc(time.Second*10, func() { close(done) })
 		return
 	}
+
 	for _, n := range seeds {
 		log.Debug("", "msg", log.Lazy{Fn: func() string {
 			var age string
@@ -1028,7 +1029,7 @@ func init() {
 
 // handle processes packets sent by n and events related to n.
 func (net *Network) handle(n *Node, ev nodeEvent, pkt *ingressPacket) error {
-	//fmt.Println("handle", n.addr().String(), n.state, ev)
+	//fmt.Println("handle - sent by", n.addr().String(), n.state, ev)
 	if pkt != nil {
 		if err := net.checkPacket(n, ev, pkt); err != nil {
 			//fmt.Println("check err:", err)
@@ -1109,6 +1110,7 @@ func (net *Network) ping(n *Node, addr *net.UDPAddr) {
 		//fmt.Println(" not sent")
 		return
 	}
+	fmt.Println("Pinging remote node", "node", n.ID)
 	log.Trace("Pinging remote node", "node", n.ID)
 	n.pingTopics = net.ticketStore.regTopicSet()
 	n.pingEcho = net.conn.sendPing(n, addr, n.pingTopics)
@@ -1228,7 +1230,7 @@ func (net *Network) checkTopicRegister(data *topicRegister) (*pong, error) {
 	if rlpHash(data.Topics) != pongpkt.data.(*pong).TopicHash {
 		return nil, errors.New("topic hash mismatch")
 	}
-	if data.Idx < 0 || int(data.Idx) >= len(data.Topics) {
+	if data.Idx >= uint(len(data.Topics)) {
 		return nil, errors.New("topic index out of range")
 	}
 	return pongpkt.data.(*pong), nil
