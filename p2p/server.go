@@ -896,13 +896,20 @@ func (srv *Server) listenLoop() {
 
 		// Reject connections on banned list
 		if srv.BannedNodes != nil {
-			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok && srv.BannedNodes.Contains(tcp.IP) {
-				//fmt.Println("Rejected conn (node banned)", "addr", tcp.IP)
-				srv.log.Debug("Rejected conn (node banned)", "addr", tcp.IP)
-				fd.Close()
-				slots <- struct{}{}
-				continue
+
+			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok {
+				srv.bannedmu.RLock()
+				banned := srv.BannedNodes.Contains(tcp.IP)
+				srv.bannedmu.RUnlock()
+				if banned {
+					//fmt.Println("Rejected conn (node banned)", "addr", tcp.IP)
+					srv.log.Debug("Rejected conn (node banned)", "addr", tcp.IP)
+					fd.Close()
+					slots <- struct{}{}
+					continue
+				}
 			}
+
 		}
 
 		var ip net.IP
@@ -926,13 +933,17 @@ func (srv *Server) BanNode(ip net.IP) {
 			Limit: 255,
 		}
 	}
+	srv.bannedmu.Lock()
 	srv.BannedNodes.Add(ip)
+	srv.bannedmu.Unlock()
 	//fmt.Printf("[DEBUG] Bannode(%v)\n", ip)
 }
 
 // Unbans a remote IP
 func (srv *Server) UnbanNode(ip net.IP) {
+	srv.bannedmu.Lock()
 	srv.BannedNodes.Remove(ip)
+	srv.bannedmu.Unlock()
 }
 
 // SetupConn runs the handshakes and attempts to add the connection

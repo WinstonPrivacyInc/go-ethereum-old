@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	"sync"
 )
 
 const (
@@ -69,22 +70,23 @@ func (t TCPDialer) Dial(dest *enode.Node) (net.Conn, error) {
 // of the main loop in Server.run.
 type dialstate struct {
 	maxDynDials int
-	ntab        discoverTable
-	netrestrict *netutil.Netlist
-	self        enode.ID
+	ntab        	discoverTable
+	netrestrict 	*netutil.Netlist
+	self        	enode.ID
 
-	lookupRunning bool
-	dialing       map[enode.ID]connFlag
-	lookupBuf     []*enode.Node // current discovery lookup results
-	randomNodes   []*enode.Node // filled from Table
-	static        map[enode.ID]*dialTask
-	hist          *dialHistory
+	lookupRunning 	bool
+	dialing       	map[enode.ID]connFlag
+	lookupBuf     	[]*enode.Node // current discovery lookup results
+	randomNodes   	[]*enode.Node // filled from Table
+	static        	map[enode.ID]*dialTask
+	hist          	*dialHistory
 
 	// RLS 8/24/2018 - reference to server's BannedNodes list, allowing us to prevent outbound connections to blacklisted nodes
 	BannedNodes *netutil.DistinctNetSet
+	bannedmu 	sync.RWMutex	// protects BannedNodes
 
-	start     time.Time     // time when the dialer was first used
-	bootnodes []*enode.Node // default dials when there are no peers
+	start     	time.Time     // time when the dialer was first used
+	bootnodes 	[]*enode.Node // default dials when there are no peers
 }
 
 type discoverTable interface {
@@ -273,6 +275,8 @@ var (
 )
 
 func (s *dialstate) checkDial(n *enode.Node, peers map[enode.ID]*Peer) error {
+	s.bannedmu.RLock()
+	defer s.bannedmu.RUnlock()
 	_, dialing := s.dialing[n.ID()]
 	switch {
 	case s.BannedNodes != nil && s.BannedNodes.Contains(n.IP()):
