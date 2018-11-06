@@ -117,6 +117,7 @@ type Config struct {
 
 	// RLS 6/19/2018 - Maintain list of banned IP addresses
 	BannedNodes *netutil.DistinctNetSet `toml:",omitempty"`
+	Bannedmu 	sync.RWMutex	// protects BannedNodes
 
 	// NodeDatabase is the path to the database containing the previously seen
 	// live nodes in the network.
@@ -463,7 +464,7 @@ func (srv *Server) Start() (err error) {
 	}
 
 	dynPeers := srv.maxDialedConns()
-	dialer := newDialState(srv.localnode.ID(), srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers, srv.NetRestrict, srv.BannedNodes)
+	dialer := newDialState(srv.localnode.ID(), srv.StaticNodes, srv.BootstrapNodes, srv.ntab, dynPeers, srv.NetRestrict, srv.BannedNodes, &srv.Bannedmu)
 	srv.loopWG.Add(1)
 	go srv.run(dialer)
 	return nil
@@ -898,9 +899,9 @@ func (srv *Server) listenLoop() {
 		if srv.BannedNodes != nil {
 
 			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok {
-				srv.bannedmu.RLock()
+				srv.Bannedmu.RLock()
 				banned := srv.BannedNodes.Contains(tcp.IP)
-				srv.bannedmu.RUnlock()
+				srv.Bannedmu.RUnlock()
 				if banned {
 					//fmt.Println("Rejected conn (node banned)", "addr", tcp.IP)
 					srv.log.Debug("Rejected conn (node banned)", "addr", tcp.IP)
@@ -933,17 +934,17 @@ func (srv *Server) BanNode(ip net.IP) {
 			Limit: 255,
 		}
 	}
-	srv.bannedmu.Lock()
+	srv.Bannedmu.Lock()
 	srv.BannedNodes.Add(ip)
-	srv.bannedmu.Unlock()
+	srv.Bannedmu.Unlock()
 	//fmt.Printf("[DEBUG] Bannode(%v)\n", ip)
 }
 
 // Unbans a remote IP
 func (srv *Server) UnbanNode(ip net.IP) {
-	srv.bannedmu.Lock()
+	srv.Bannedmu.Lock()
 	srv.BannedNodes.Remove(ip)
-	srv.bannedmu.Unlock()
+	srv.Bannedmu.Unlock()
 }
 
 // SetupConn runs the handshakes and attempts to add the connection

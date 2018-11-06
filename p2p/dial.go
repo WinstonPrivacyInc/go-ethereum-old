@@ -83,7 +83,7 @@ type dialstate struct {
 
 	// RLS 8/24/2018 - reference to server's BannedNodes list, allowing us to prevent outbound connections to blacklisted nodes
 	BannedNodes *netutil.DistinctNetSet
-	bannedmu 	sync.RWMutex	// protects BannedNodes
+	Bannedmu 	*sync.RWMutex	// protects BannedNodes
 
 	start     	time.Time     // time when the dialer was first used
 	bootnodes 	[]*enode.Node // default dials when there are no peers
@@ -133,7 +133,7 @@ type waitExpireTask struct {
 	time.Duration
 }
 
-func newDialState(self enode.ID, static []*enode.Node, bootnodes []*enode.Node, ntab discoverTable, maxdyn int, netrestrict *netutil.Netlist, bannednodes *netutil.DistinctNetSet) *dialstate {
+func newDialState(self enode.ID, static []*enode.Node, bootnodes []*enode.Node, ntab discoverTable, maxdyn int, netrestrict *netutil.Netlist, bannednodes *netutil.DistinctNetSet, bannedmu *sync.RWMutex) *dialstate {
 	s := &dialstate{
 		maxDynDials: maxdyn,
 		ntab:        ntab,
@@ -145,6 +145,7 @@ func newDialState(self enode.ID, static []*enode.Node, bootnodes []*enode.Node, 
 		randomNodes: make([]*enode.Node, maxdyn/2),
 		hist:        new(dialHistory),
 		BannedNodes: bannednodes,
+		Bannedmu:    bannedmu,
 	}
 	copy(s.bootnodes, bootnodes)
 	for _, n := range static {
@@ -275,8 +276,8 @@ var (
 )
 
 func (s *dialstate) checkDial(n *enode.Node, peers map[enode.ID]*Peer) error {
-	s.bannedmu.RLock()
-	defer s.bannedmu.RUnlock()
+	s.Bannedmu.RLock()
+	defer s.Bannedmu.RUnlock()
 	_, dialing := s.dialing[n.ID()]
 	switch {
 	case s.BannedNodes != nil && s.BannedNodes.Contains(n.IP()):
