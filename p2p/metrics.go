@@ -25,11 +25,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/winstonprivacyinc/go-ethereum/p2p/enode"
 
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/winstonprivacyinc/go-ethereum/event"
+	"github.com/winstonprivacyinc/go-ethereum/log"
+	"github.com/winstonprivacyinc/go-ethereum/metrics"
 )
 
 const (
