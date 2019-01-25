@@ -24,6 +24,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"sync"
 )
 
 var lan4, lan6, special4, special6 Netlist
@@ -224,12 +225,15 @@ type DistinctNetSet struct {
 
 	members map[string]uint
 	buf     net.IP
+	mu 	sync.RWMutex
 }
 
 // Add adds an IP address to the set. It returns false (and doesn't add the IP) if the
 // number of existing IPs in the defined range exceeds the limit.
 func (s *DistinctNetSet) Add(ip net.IP) bool {
 	key := s.key(ip)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	n := s.members[string(key)]
 	if n < s.Limit {
 		s.members[string(key)] = n + 1
@@ -241,6 +245,8 @@ func (s *DistinctNetSet) Add(ip net.IP) bool {
 // Remove removes an IP from the set.
 func (s *DistinctNetSet) Remove(ip net.IP) {
 	key := s.key(ip)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if n, ok := s.members[string(key)]; ok {
 		if n == 1 {
 			delete(s.members, string(key))
@@ -253,6 +259,8 @@ func (s *DistinctNetSet) Remove(ip net.IP) {
 // Contains whether the given IP is contained in the set.
 func (s DistinctNetSet) Contains(ip net.IP) bool {
 	key := s.key(ip)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	_, ok := s.members[string(key)]
 	return ok
 }
@@ -260,6 +268,8 @@ func (s DistinctNetSet) Contains(ip net.IP) bool {
 // Len returns the number of tracked IPs.
 func (s DistinctNetSet) Len() int {
 	n := uint(0)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, i := range s.members {
 		n += i
 	}
@@ -301,9 +311,11 @@ func (s DistinctNetSet) String() string {
 	var buf bytes.Buffer
 	buf.WriteString("{")
 	keys := make([]string, 0, len(s.members))
+	s.mu.RLock()
 	for k := range s.members {
 		keys = append(keys, k)
 	}
+	s.mu.RUnlock()
 	sort.Strings(keys)
 	for i, k := range keys {
 		var ip net.IP
