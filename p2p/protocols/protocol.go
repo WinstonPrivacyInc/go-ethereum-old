@@ -23,7 +23,7 @@ devp2p subprotocols by abstracting away code standardly shared by protocols.
 * provide the forever loop to read incoming messages
 * standardise error handling related to communication
 * standardised	handshake negotiation
-* TODO: automatic generation of wire protocol specification for peers 
+* TODO: automatic generation of wire protocol specification for peers
 
 */
 package protocols

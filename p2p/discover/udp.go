@@ -292,6 +292,7 @@ func (t *udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
+	fmt.Println("[DEBUG] Sending ping to", *toaddr, toid)
 	req := &ping{
 		Version:    4,
 		From:       t.ourEndpoint(),
@@ -629,6 +630,7 @@ func (req *ping) handle(t *udp, from *net.UDPAddr, fromKey encPubkey, mac []byte
 		ReplyTok:   mac,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	})
+	fmt.Println("[DEBUG] PONG to", *from, req.From.TCP)
 	n := wrapNode(enode.NewV4(key, from.IP, int(req.From.TCP), from.Port))
 	t.handleReply(n.ID(), pingPacket, req)
 	if time.Since(t.db.LastPongReceived(n.ID())) > bondExpiration {
