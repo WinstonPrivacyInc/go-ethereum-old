@@ -154,6 +154,9 @@ type Config struct {
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
+
+	// Set to assign a unique network id.
+	NetworkId 	string
 }
 
 // Server manages all peer connections.
@@ -550,8 +553,9 @@ func (srv *Server) setupDiscovery() error {
 			NetRestrict: srv.NetRestrict,
 			Bootnodes:   srv.BootstrapNodes,
 			Unhandled:   unhandled,
+			NetworkId:   []byte(srv.NetworkId),
 		}
-		//fmt.Println("[DEBUG] setupDiscovery() Listening on disc v4", conn)
+		fmt.Println("[DEBUG] setupDiscovery() Listening on disc v4", conn, "network id", srv.NetworkId)
 		ntab, err := discover.ListenUDP(conn, srv.localnode, cfg)
 		if err != nil {
 			return err
