@@ -306,9 +306,7 @@ func (t *udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
 	return <-t.sendPing(toid, toaddr, nil)
 }
 
-func (t *udp) Salt() ([]byte) {
-	return udp.salt
-}
+
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
@@ -319,7 +317,7 @@ func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-ch
 		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
-	packet, hash, err := encodePacket(t.priv, pingPacket, udp.Salt(), req)
+	packet, hash, err := encodePacket(t.priv, pingPacket, t.salt, req)
 	if err != nil {
 		errc := make(chan error, 1)
 		errc <- err
@@ -526,7 +524,7 @@ func init() {
 }
 
 func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) {
-	packet, hash, err := encodePacket(t.priv, ptype, udp.salt, req)
+	packet, hash, err := encodePacket(t.priv, ptype, t.salt, req)
 	if err != nil {
 		return hash, err
 	}
@@ -595,7 +593,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
-	packet, fromID, hash, err := decodePacket(buf, udp.salt)
+	packet, fromID, hash, err := decodePacket(buf, t.salt)
 	// TODO: Drop packets from banned addresses
 	if err != nil {
 		log.Debug("Bad discv4 packet", "addr", from, "err", err)
