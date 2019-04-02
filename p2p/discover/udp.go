@@ -306,6 +306,9 @@ func (t *udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
 	return <-t.sendPing(toid, toaddr, nil)
 }
 
+func (t *udp) Salt() ([]byte) {
+	return udp.salt
+}
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
@@ -316,8 +319,7 @@ func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-ch
 		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
-	salt := udp.salt
-	packet, hash, err := encodePacket(t.priv, pingPacket, salt, req)
+	packet, hash, err := encodePacket(t.priv, pingPacket, udp.Salt(), req)
 	if err != nil {
 		errc := make(chan error, 1)
 		errc <- err
