@@ -33,6 +33,9 @@ import (
 	"github.com/winstonprivacyinc/go-ethereum/rlp"
 )
 
+// RLS - Patch to segregate Winston network from other Ethereum nodes
+var Salt = []byte("Winston1776")
+
 // Errors
 var (
 	errPacketTooSmall   = errors.New("too small")
@@ -537,7 +540,8 @@ func encodePacket(priv *ecdsa.PrivateKey, ptype byte, req interface{}) (packet, 
 	// add the hash to the front. Note: this doesn't protect the
 	// packet in any way. Our public key will be part of this hash in
 	// The future.
-	hash = crypto.Keccak256(packet[macSize:])
+	// RLS - Salt the hash to prevent communication with non-Winston ethereum networks.
+	hash = crypto.Keccak256(packet[macSize:], Salt)
 	copy(packet, hash)
 	return packet, hash, nil
 }
@@ -590,7 +594,8 @@ func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
 		return nil, encPubkey{}, nil, errPacketTooSmall
 	}
 	hash, sig, sigdata := buf[:macSize], buf[macSize:headSize], buf[headSize:]
-	shouldhash := crypto.Keccak256(buf[macSize:])
+	// RLS - Salt the hash to prevent communication with non-Winston ethereum networks.
+	shouldhash := crypto.Keccak256(buf[macSize:], Salt)
 	if !bytes.Equal(hash, shouldhash) {
 		return nil, encPubkey{}, nil, errBadHash
 	}
