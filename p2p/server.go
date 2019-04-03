@@ -878,6 +878,7 @@ func (srv *Server) listenLoop() {
 		for {
 			srv.log.Debug("RLPx listener is waiting")
 			fd, err = srv.listener.Accept()
+			srv.log.Debug("RLPx listener received incoming connection", err)
 
 			if netutil.IsTemporaryError(err) {
 				srv.log.Debug("Temporary read error", "err", err)
@@ -924,6 +925,7 @@ func (srv *Server) listenLoop() {
 		fd = newMeteredConn(fd, true, ip)
 		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		go func() {
+			srv.log.Debug("[DEBUG] About to call SetupConn()...")
 			srv.SetupConn(fd, inboundConn, nil)
 			slots <- struct{}{}
 		}()
