@@ -758,7 +758,7 @@ running:
 				}
 				name := truncateName(c.name)
 				//fmt.Printf("  *** run() <- addpeer - c: %+v  peer: %+v\n", c, p)
-				//fmt.Println("  *** Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
+				fmt.Println("[DEBUG] Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				srv.log.Debug("Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				go srv.runPeer(p)
 				peers[c.node.ID()] = p
