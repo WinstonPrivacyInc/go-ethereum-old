@@ -33,6 +33,9 @@ import (
 	"github.com/winstonprivacyinc/go-ethereum/rlp"
 )
 
+// RLS - Patch to segregate Winston network from other Ethereum nodes
+var Salt = []byte("Winston1776")
+
 // Errors
 var (
 	errPacketTooSmall   = errors.New("too small")
@@ -180,6 +183,9 @@ type udp struct {
 	addpending chan *pending
 	gotreply   chan reply
 	closing    chan struct{}
+
+	// RLS - Added salt to enable private networks
+	salt 	    []byte
 }
 
 // pending represents a pending reply.
@@ -234,6 +240,9 @@ type Config struct {
 	NetRestrict *netutil.Netlist  // network whitelist
 	Bootnodes   []*enode.Node     // list of bootstrap nodes
 	Unhandled   chan<- ReadPacket // unhandled packets are sent on this channel
+
+	// RLS - Unique network id. Will only communicate with nodes sharing the same network id.
+	NetworkId   []byte
 }
 
 // ListenUDP returns a new table that listens for UDP packets on laddr.
@@ -255,7 +264,15 @@ func newUDP(c conn, ln *enode.LocalNode, cfg Config) (*Table, *udp, error) {
 		closing:     make(chan struct{}),
 		gotreply:    make(chan reply),
 		addpending:  make(chan *pending),
+		salt:        Salt,
 	}
+
+	// RLS - Enable private networks
+	if len(cfg.NetworkId) > 0 {
+		udp.salt = cfg.NetworkId
+	}
+	//fmt.Println("[DEBUG] Setting p2p private network id to", string(udp.salt))
+
 	tab, err := newTable(udp, ln.Database(), cfg.Bootnodes)
 	if err != nil {
 		return nil, nil, err
@@ -289,16 +306,19 @@ func (t *udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
 	return <-t.sendPing(toid, toaddr, nil)
 }
 
+
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
+	//fmt.Println("[DEBUG] Sending ping to", *toaddr, toid)
 	req := &ping{
 		Version:    4,
 		From:       t.ourEndpoint(),
 		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
-	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	//fmt.Println("[DEBUG] Encoding ping packet with hash", string(t.salt))
+	packet, hash, err := encodePacket(t.priv, pingPacket, t.salt, req)
 	if err != nil {
 		errc := make(chan error, 1)
 		errc <- err
@@ -505,7 +525,7 @@ func init() {
 }
 
 func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) {
-	packet, hash, err := encodePacket(t.priv, ptype, req)
+	packet, hash, err := encodePacket(t.priv, ptype, t.salt, req)
 	if err != nil {
 		return hash, err
 	}
@@ -518,7 +538,7 @@ func (t *udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	return err
 }
 
-func encodePacket(priv *ecdsa.PrivateKey, ptype byte, req interface{}) (packet, hash []byte, err error) {
+func encodePacket(priv *ecdsa.PrivateKey, ptype byte, salt []byte, req interface{}) (packet, hash []byte, err error) {
 	b := new(bytes.Buffer)
 	b.Write(headSpace)
 	b.WriteByte(ptype)
@@ -536,7 +556,8 @@ func encodePacket(priv *ecdsa.PrivateKey, ptype byte, req interface{}) (packet, 
 	// add the hash to the front. Note: this doesn't protect the
 	// packet in any way. Our public key will be part of this hash in
 	// The future.
-	hash = crypto.Keccak256(packet[macSize:])
+	// RLS - Salt the hash to prevent communication with non-Winston ethereum networks.
+	hash = crypto.Keccak256(packet[macSize:], salt)
 	copy(packet, hash)
 	return packet, hash, nil
 }
@@ -573,7 +594,10 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
-	packet, fromID, hash, err := decodePacket(buf)
+	packet, fromID, hash, err := decodePacket(buf, t.salt)
+	//fmt.Println("[DEBUG] Decoding incoming packet with hash", string(t.salt), "err", err)
+
+
 	// TODO: Drop packets from banned addresses
 	if err != nil {
 		log.Debug("Bad discv4 packet", "addr", from, "err", err)
@@ -584,12 +608,13 @@ func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
 	return err
 }
 
-func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
+func decodePacket(buf []byte, salt []byte) (packet, encPubkey, []byte, error) {
 	if len(buf) < headSize+1 {
 		return nil, encPubkey{}, nil, errPacketTooSmall
 	}
 	hash, sig, sigdata := buf[:macSize], buf[macSize:headSize], buf[headSize:]
-	shouldhash := crypto.Keccak256(buf[macSize:])
+	// RLS - Salt the hash to prevent communication with non-Winston ethereum networks.
+	shouldhash := crypto.Keccak256(buf[macSize:], salt)
 	if !bytes.Equal(hash, shouldhash) {
 		return nil, encPubkey{}, nil, errBadHash
 	}
@@ -629,6 +654,7 @@ func (req *ping) handle(t *udp, from *net.UDPAddr, fromKey encPubkey, mac []byte
 		ReplyTok:   mac,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	})
+	//fmt.Println("[DEBUG] PONG to", *from, req.From.TCP)
 	n := wrapNode(enode.NewV4(key, from.IP, int(req.From.TCP), from.Port))
 	t.handleReply(n.ID(), pingPacket, req)
 	if time.Since(t.db.LastPongReceived(n.ID())) > bondExpiration {
