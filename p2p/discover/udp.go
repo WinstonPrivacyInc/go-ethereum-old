@@ -271,7 +271,7 @@ func newUDP(c conn, ln *enode.LocalNode, cfg Config) (*Table, *udp, error) {
 	if len(cfg.NetworkId) > 0 {
 		udp.salt = cfg.NetworkId
 	}
-	fmt.Println("[DEBUG] Setting p2p private network id to", string(udp.salt))
+	//fmt.Println("[DEBUG] Setting p2p private network id to", string(udp.salt))
 
 	tab, err := newTable(udp, ln.Database(), cfg.Bootnodes)
 	if err != nil {
@@ -310,7 +310,7 @@ func (t *udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
 func (t *udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
-	fmt.Println("[DEBUG] Sending ping to", *toaddr, toid)
+	//fmt.Println("[DEBUG] Sending ping to", *toaddr, toid)
 	req := &ping{
 		Version:    4,
 		From:       t.ourEndpoint(),
@@ -654,7 +654,7 @@ func (req *ping) handle(t *udp, from *net.UDPAddr, fromKey encPubkey, mac []byte
 		ReplyTok:   mac,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	})
-	fmt.Println("[DEBUG] PONG to", *from, req.From.TCP)
+	//fmt.Println("[DEBUG] PONG to", *from, req.From.TCP)
 	n := wrapNode(enode.NewV4(key, from.IP, int(req.From.TCP), from.Port))
 	t.handleReply(n.ID(), pingPacket, req)
 	if time.Since(t.db.LastPongReceived(n.ID())) > bondExpiration {

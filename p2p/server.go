@@ -555,7 +555,7 @@ func (srv *Server) setupDiscovery() error {
 			Unhandled:   unhandled,
 			NetworkId:   []byte(srv.NetworkId),
 		}
-		fmt.Println("[DEBUG] setupDiscovery() Listening on disc v4", conn, "network id", srv.NetworkId)
+		//fmt.Println("[DEBUG] setupDiscovery() Listening on disc v4", conn, "network id", srv.NetworkId)
 		ntab, err := discover.ListenUDP(conn, srv.localnode, cfg)
 		if err != nil {
 			return err
@@ -757,8 +757,7 @@ running:
 					p.events = &srv.peerFeed
 				}
 				name := truncateName(c.name)
-				//fmt.Printf("  *** run() <- addpeer - c: %+v  peer: %+v\n", c, p)
-				fmt.Println("[DEBUG] Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
+				//fmt.Println("[DEBUG] Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				srv.log.Debug("Adding p2p peer", "name", name, "addr", c.fd.RemoteAddr(), "peers", len(peers)+1)
 				go srv.runPeer(p)
 				peers[c.node.ID()] = p
@@ -878,7 +877,6 @@ func (srv *Server) listenLoop() {
 		for {
 			srv.log.Debug("RLPx listener is waiting")
 			fd, err = srv.listener.Accept()
-			srv.log.Debug("RLPx listener received incoming connection", err)
 
 			if netutil.IsTemporaryError(err) {
 				srv.log.Debug("Temporary read error", "err", err)
@@ -925,7 +923,6 @@ func (srv *Server) listenLoop() {
 		fd = newMeteredConn(fd, true, ip)
 		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		go func() {
-			srv.log.Debug("[DEBUG] About to call SetupConn()...")
 			srv.SetupConn(fd, inboundConn, nil)
 			slots <- struct{}{}
 		}()
@@ -967,7 +964,7 @@ func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *enode.Node) 
 }
 
 func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) error {
-	fmt.Println("[DEBUG] setupConn()", "remote addr", c.fd.RemoteAddr(),)
+	//fmt.Println("[DEBUG] setupConn()", "remote addr", c.fd.RemoteAddr(),)
 	// Prevent leftover pending conns from entering the handshake.
 	srv.lock.Lock()
 	running := srv.running
