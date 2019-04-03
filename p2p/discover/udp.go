@@ -271,7 +271,7 @@ func newUDP(c conn, ln *enode.LocalNode, cfg Config) (*Table, *udp, error) {
 	if len(cfg.NetworkId) > 0 {
 		udp.salt = cfg.NetworkId
 	}
-	fmt.Println("[DEBUG] Setting p2p private network id to", string(udp.salt))
+	fmt.Println("[DEBUG] Setting p2p private network id to", string(udp.salt), "Unhandled channel", cfg.Unhandled)
 
 	tab, err := newTable(udp, ln.Database(), cfg.Bootnodes)
 	if err != nil {
@@ -585,6 +585,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 			return
 		}
 		if t.handlePacket(from, buf[:nbytes]) != nil && unhandled != nil {
+			fmt.Println("[DEBUG] Sending error to unhandled.")
 			select {
 			case unhandled <- ReadPacket{buf[:nbytes], from}:
 			default:
